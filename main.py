@@ -407,7 +407,7 @@ def save_inventory_to_file():
             except ValueError:
                 continue
 
-    # Save rune entries (slots 33-64)
+    # Save rune entries (slots 32-63)
     for i, (rune_var, count_entry, current_rune_label) in enumerate(rune_entries):
         rune_name = rune_var.get()
         count_text = count_entry.get()
@@ -424,14 +424,14 @@ def save_inventory_to_file():
                     guid = secrets.token_urlsafe(16)
                     # Add VitalShield for Fire and Air runes
                     if rune_name in ["Fire Rune", "Air Rune"]:
-                        current_inventory_data["Inventory"][str(i + 33)] = {
+                        current_inventory_data["Inventory"][str(i + 32)] = {
                             "GUID": guid,
                             "ItemData": rune_id,
                             "Count": count,
                             "VitalShield": 0
                         }
                     else:
-                        current_inventory_data["Inventory"][str(i + 33)] = {
+                        current_inventory_data["Inventory"][str(i + 32)] = {
                             "GUID": guid,
                             "ItemData": rune_id,
                             "Count": count
@@ -890,12 +890,12 @@ def refresh_display():
                     count = item.get("Count", 0)
                     count_entry.delete(0, tk.END)
                     count_entry.insert(0, str(count))
-            elif 33 <= slot_index < 65:  # Rune slots
+            elif 32 <= slot_index < 64:  # Rune slots
                 item_id = item.get("ItemData", "Unknown ID")
                 rune_name = rune_name_map.get(item_id, f"Unknown Rune ({item_id})")
                 count = item.get("Count", 0)
                 
-                rune_index = slot_index - 33
+                rune_index = slot_index - 32
                 if 0 <= rune_index < len(rune_entries):
                     rune_var, count_entry, current_rune_label = rune_entries[rune_index]
                     rune_var.set(rune_name)
@@ -1379,11 +1379,11 @@ rune_label = tk.Label(rune_title_frame, text="Runes",
                      font=('RuneScape UF', 12, 'bold'))
 rune_label.pack()
 
-# Create rune slots (from slot 33 onwards)
-for i in range(33, 65):  # Create slots 33-64
+# Create rune slots (from slot 32 onwards)
+for i in range(32, 64):  # Create slots 32-63
     # Create a frame for each rune slot
     slot_frame = tk.Frame(rune_frame, bg=RS_EMPTY_BORDER, relief='ridge', bd=2)
-    slot_frame.grid(row=(i-33) // 8, column=(i-33) % 8, padx=1, pady=1)
+    slot_frame.grid(row=(i-32) // 8, column=(i-32) % 8, padx=1, pady=1)
     
     # Inner frame for content
     inner_frame = tk.Frame(slot_frame, bg=RS_TAN)
