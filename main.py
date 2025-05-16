@@ -196,14 +196,13 @@ gear_name_map = {
 
 # Add rune name mapping
 rune_name_map = {
-    "lCE7i3iXGUuHv7FphIOcXg": "Air Rune",
-    "_QMgbMYhjU-9jAD_euFbyQ": "Water Rune",
-    "iKbF7k2XvufGqqyg5rK-vQ": "Earth Rune",
-    "4wdYZE-FFMhS9Iia0ftWDg": "Fire Rune",
-    "_c9JTkwKy8s88GWv586hbQ": "Mind Rune",
-    "bbLdJRhwPEWt1ScENYRUCg": "Body Rune",
-    "Dvo6TE2d7YNnoni8XbKYzw": "Cosmic Rune",
-    "EacnEk2SKqmy6zGxnrhpRw": "Chaos Rune"
+    "Dvo6TE2d7YNnoni8XbKYzw": "Air Rune",
+    "bbLdJRhwPEWt1ScENYRUCg": "Water Rune",
+    "lCE7i3iXGUuHv7FphIOcXg": "Earth Rune",
+    "_QMgbMYhjU-9jAD_euFbyQ": "Fire Rune",
+    "iKbF7k2XvufGqqyg5rK-vQ": "Nature Rune",  # Add placeholder ID
+    "_c9JTkwKy8s88GWv586hbQ": "Law Rune",        # Add placeholder ID
+    "4wdYZE-FFMhS9Iia0ftWDg": "Astral Rune"   # Add placeholder ID
 }
 
 json_files = []
@@ -386,9 +385,9 @@ def save_inventory_to_file():
                 # Find the item ID from the name
                 item_id = None
                 if item_name in gear_name_map.values():
-                    item_id = next((k for k, v in gear_name_map.items() if v == item_name), None)
+                    item_id = next((k for k, v in gear_name_map.items() if v.lower() == item_name.lower()), None)
                 else:
-                    item_id = next((k for k, v in item_name_map.items() if v == item_name), None)
+                    item_id = next((k for k, v in item_name_map.items() if v.lower() == item_name.lower()), None)
                 
                 if item_id:
                     guid = secrets.token_urlsafe(16)
@@ -419,15 +418,24 @@ def save_inventory_to_file():
                 count = max(1, int(count_text))
                 
                 # Find the rune ID from the name
-                rune_id = next((k for k, v in rune_name_map.items() if v == rune_name), None)
+                rune_id = next((k for k, v in rune_name_map.items() if v.lower() == rune_name.lower()), None)
                 
                 if rune_id:
                     guid = secrets.token_urlsafe(16)
-                    current_inventory_data["Inventory"][str(i + 33)] = {
-                        "GUID": guid,
-                        "ItemData": rune_id,
-                        "Count": count
-                    }
+                    # Add VitalShield for Fire and Air runes
+                    if rune_name in ["Fire Rune", "Air Rune"]:
+                        current_inventory_data["Inventory"][str(i + 33)] = {
+                            "GUID": guid,
+                            "ItemData": rune_id,
+                            "Count": count,
+                            "VitalShield": 0
+                        }
+                    else:
+                        current_inventory_data["Inventory"][str(i + 33)] = {
+                            "GUID": guid,
+                            "ItemData": rune_id,
+                            "Count": count
+                        }
             except ValueError:
                 continue
 
@@ -489,6 +497,52 @@ def save_inventory_to_file():
     # Set the MaxSlotIndex inside the Inventory object
     current_inventory_data["Inventory"]["MaxSlotIndex"] = max_slot_index
 
+    # Save skills data
+    if "Skills" not in current_inventory_data:
+        current_inventory_data["Skills"] = {"Skills": []}
+    else:
+        current_inventory_data["Skills"]["Skills"] = []
+
+    # ID to Name mapping for skills
+    skill_names = {
+        "Wf3i7Ha-B06DH719j1vtBw": "Artisan",
+        "4pefO9k1lUqfA6mvHNi1SA": "Attack",
+        "waK-8EyQFQ2xEjCGYmuTRQ": "Construction",
+        "Tn7t6DQyX0-Q0cM5K7B90A": "Cooking",
+        "0hreSMRVXUihq9qjDO2CFA": "Magic/Ranged",
+        "jqX0Gh6QI0GFFPCDFK_CJQ": "Mining",
+        "heq7u88Q2UuLXFqLGTVwQw": "Magic/Ranged",
+        "NOqC-z-2ckqi0El22qMFlw": "Runecrafting",
+        "4zYUGF5u_0KbMLkWJmmBbQ": "Woodcutting"
+    }
+
+    # Save current skills state from UI
+    for row_frame in skill_labels:
+        name_label = row_frame.winfo_children()[0]
+        xp_entry = row_frame.winfo_children()[1]
+        
+        skill_name = name_label.cget("text").rstrip(":")
+        xp_text = xp_entry.get()
+        
+        try:
+            xp = int(xp_text)
+            # For Magic/Ranged, save both IDs
+            if skill_name == "Magic/Ranged":
+                current_inventory_data["Skills"]["Skills"].extend([
+                    {"Id": "0hreSMRVXUihq9qjDO2CFA", "Xp": xp},
+                    {"Id": "heq7u88Q2UuLXFqLGTVwQw", "Xp": xp}
+                ])
+            else:
+                # Find the skill ID from the name for other skills
+                skill_id = next((k for k, v in skill_names.items() if v == skill_name), None)
+                if skill_id:
+                    current_inventory_data["Skills"]["Skills"].append({
+                        "Id": skill_id,
+                        "Xp": xp
+                    })
+        except ValueError:
+            continue
+
     print("\nFinal loadout data:")  # Debug print
     print(json.dumps(current_inventory_data["Loadout"], indent=2))  # Debug print
 
@@ -503,6 +557,7 @@ def save_preset():
     # Create a new data structure from current UI state
     preset_data = {
         "Inventory": {},
+        "Loadout": {},
         "Skills": {"Skills": []}
     }
     
@@ -534,9 +589,9 @@ def save_preset():
                 # Find the item ID from the name
                 item_id = None
                 if item_name in gear_name_map.values():
-                    item_id = next((k for k, v in gear_name_map.items() if v == item_name), None)
+                    item_id = next((k for k, v in gear_name_map.items() if v.lower() == item_name.lower()), None)
                 else:
-                    item_id = next((k for k, v in item_name_map.items() if v == item_name), None)
+                    item_id = next((k for k, v in item_name_map.items() if v.lower() == item_name.lower()), None)
                 
                 if item_id:
                     guid = secrets.token_urlsafe(16)
@@ -555,6 +610,31 @@ def save_preset():
                         }
             except ValueError:
                 continue
+
+    # Save current loadout state from UI
+    for i, (item_var, count_entry, current_item_label) in enumerate(loadout_entries):
+        item_name = item_var.get()
+        count_text = count_entry.get()
+        
+        if item_name and item_name != "Empty":
+            try:
+                count = int(count_text)
+                # Find the item ID from the name (case-insensitive)
+                item_id = next((k for k, v in gear_name_map.items() if v.lower() == item_name.lower()), None)
+                
+                if item_id:
+                    guid = secrets.token_urlsafe(16)
+                    preset_data["Loadout"][str(i)] = {
+                        "GUID": guid,
+                        "ItemData": item_id,
+                        "Durability": count,
+                        "VitalShield": 0
+                    }
+            except ValueError:
+                continue
+    
+    # Set MaxSlotIndex for loadout
+    preset_data["Loadout"]["MaxSlotIndex"] = 4
 
     # Save current skills state from UI
     for row_frame in skill_labels:
@@ -640,6 +720,18 @@ def load_preset():
             slot_frame = inventory_frame.grid_slaves(row=i // 8, column=i % 8)[0]
             slot_frame.configure(bg=RS_EMPTY_BORDER)
         
+        # Clear loadout entries
+        for item_var, count_entry, current_item_label in loadout_entries:
+            item_var.set("Empty")
+            count_entry.delete(0, tk.END)
+            count_entry.insert(0, "0")
+            current_item_label.configure(text="Empty")
+            
+            # Set all loadout slot borders to red initially
+            slot_frame = loadout_frame.grid_slaves(row=loadout_entries.index((item_var, count_entry, current_item_label)) // 3, 
+                                                 column=loadout_entries.index((item_var, count_entry, current_item_label)) % 3)[0]
+            slot_frame.configure(bg=RS_EMPTY_BORDER)
+        
         # Load inventory data to UI
         for slot_str, item in preset_data.get("Inventory", {}).items():
             try:
@@ -677,6 +769,31 @@ def load_preset():
                         slot_frame.configure(bg=RS_FILLED_BORDER)
             except Exception as e:
                 print(f"Error loading slot {slot_str}: {e}")
+                continue
+        
+        # Load loadout data to UI
+        for slot_str, item in preset_data.get("Loadout", {}).items():
+            try:
+                slot_index = int(slot_str)
+                if 0 <= slot_index < 5:  # Loadout slots 0-4
+                    item_id = item.get("ItemData", "Unknown ID")
+                    item_name = gear_name_map.get(item_id, f"Unknown Item ({item_id})")
+                    
+                    item_var, count_entry, current_item_label = loadout_entries[slot_index]
+                    item_var.set(item_name)
+                    
+                    durability = item.get("Durability", "???")
+                    count_entry.delete(0, tk.END)
+                    count_entry.insert(0, str(durability))
+                    
+                    current_item_label.configure(text=item_name)
+                    
+                    # Update the slot border
+                    slot_frame = loadout_frame.grid_slaves(row=slot_index // 3, column=slot_index % 3)[0]
+                    slot_frame.configure(bg=RS_FILLED_BORDER)
+            except ValueError as e:
+                if slot_str != "MaxSlotIndex":  # Skip MaxSlotIndex as it's not a slot
+                    print(f"Error loading loadout slot {slot_str}: {e}")
                 continue
         
         # Load skills data to UI
@@ -911,9 +1028,16 @@ def style_editor_window(window):
             widget.configure(bg=RS_DARK_TAN, fg=RS_GOLD, font=('RuneScape UF', 10))
 
 def insert_to_checked_slots():
-    # Get the selected item and count
-    item_name = item_var.get()
+    # Get the selected item and count from the combobox
+    item_name = item_dropdown.get()  # Changed from item_var.get() to item_dropdown.get()
     count_text = count_var.get()
+    
+    print(f"\nSelected item: '{item_name}'")  # Debug print with quotes to see spaces
+    print(f"Selected count: {count_text}")  # Debug print
+    
+    if item_name == "Empty":
+        messagebox.showerror("Error", "Please select an item from the dropdown.")
+        return
     
     try:
         count = int(count_text)
@@ -921,33 +1045,67 @@ def insert_to_checked_slots():
         messagebox.showerror("Error", "Count must be a number.")
         return
     
-    # Find the item ID from the name
+    # Find the item ID from the name (case-insensitive)
     item_id = None
-    if item_name in gear_name_map.values():
-        item_id = next((k for k, v in gear_name_map.items() if v == item_name), None)
-    else:
-        item_id = next((k for k, v in item_name_map.items() if v == item_name), None)
+    
+    # Debug prints for item lookup
+    print("\nChecking gear_name_map:")
+    print("Available gear items:")
+    for k, v in gear_name_map.items():
+        print(f"  '{v}'")
+        if v.lower() == item_name.lower():
+            print(f"Found match: '{v}' -> {k}")
+            item_id = k
+            break
     
     if not item_id:
-        messagebox.showerror("Error", "Item not found.")
+        print("\nChecking item_name_map:")
+        print("Available regular items:")
+        for k, v in item_name_map.items():
+            print(f"  '{v}'")
+            if v.lower() == item_name.lower():
+                print(f"Found match: '{v}' -> {k}")
+                item_id = k
+                break
+    
+    if not item_id:
+        print(f"\nNo match found for '{item_name}'")
+        messagebox.showerror("Error", f"Item not found: '{item_name}'")
         return
     
+    print(f"\nFound item_id: {item_id}")
+    
     # Update all checked slots
+    checked_count = 0
     for i, (checkbox, slot_frame) in enumerate(zip(slot_checkboxes, inventory_frame.grid_slaves())):
         if checkbox.get():
+            checked_count += 1
+            print(f"Updating checked slot {i}")
             regular_var, gear_var, count_entry, current_item_label = slot_entries[i]
+            
+            # Get the exact name from the map to ensure case matches
+            exact_name = gear_name_map.get(item_id) if item_id in gear_name_map else item_name_map.get(item_id)
+            if not exact_name:
+                print(f"Warning: Could not find exact name for item_id {item_id}")
+                exact_name = item_name
+            
             if item_id in gear_name_map:
-                gear_var.set(item_name)
+                gear_var.set(exact_name)
                 regular_var.set("Empty")
+                print(f"Set as gear item: '{exact_name}'")
             else:
-                regular_var.set(item_name)
+                regular_var.set(exact_name)
                 gear_var.set("Empty")
+                print(f"Set as regular item: '{exact_name}'")
+            
             count_entry.delete(0, tk.END)
             count_entry.insert(0, str(count))
-            current_item_label.configure(text=item_name)
+            current_item_label.configure(text=exact_name)
             
             # Update the slot border
             slot_frame.configure(bg=RS_FILLED_BORDER)
+    
+    print(f"Updated {checked_count} slots")
 
 def toggle_checkbox(slot_frame, checkbox_var):
     # Toggle the checkbox state
@@ -1006,16 +1164,15 @@ def clear_all_selections():
             print(f"Setting slot {i} to red (empty)")
 
 def load_rune_pack():
-    # Define rune slots in order
+    # Define rune slots in order (only the ones we want to load)
     rune_order = [
         "Air Rune",
         "Water Rune",
         "Earth Rune",
         "Fire Rune",
-        "Mind Rune",
-        "Body Rune",
-        "Cosmic Rune",
-        "Chaos Rune"
+        "Nature Rune",
+        "Law Rune",
+        "Astral Rune"
     ]
     
     # Clear existing runes first
@@ -1407,29 +1564,72 @@ clear_runes_btn.pack(side=tk.LEFT, padx=5)
 contact_frame = tk.Frame(root, bg=RS_BROWN)
 contact_frame.pack(side="bottom", fill="x", pady=5)
 
-# Create a frame for the contact icon and text
+# Create a frame for the contact info
 contact_info_frame = tk.Frame(contact_frame, bg=RS_BROWN)
 contact_info_frame.pack(side="right", padx=10)
 
-# Add a label for the contact icon (you can replace this with an actual icon later)
-contact_icon = tk.Label(contact_info_frame, text="💬", 
+# Discord link
+discord_frame = tk.Frame(contact_info_frame, bg=RS_BROWN)
+discord_frame.pack(side="left", padx=5)
+
+discord_icon = tk.Label(discord_frame, text="💬", 
                        bg=RS_BROWN, fg=RS_GOLD,
                        font=('RuneScape UF', 12))
-contact_icon.pack(side="left", padx=5)
+discord_icon.pack(side="left", padx=2)
 
-# Add a label for the contact text
-contact_text = tk.Label(contact_info_frame, text="DISCORD",
+discord_text = tk.Label(discord_frame, text="Discord",
                        bg=RS_BROWN, fg=RS_GOLD,
                        font=('RuneScape UF', 10))
-contact_text.pack(side="left")
+discord_text.pack(side="left")
 
-# Make the contact section clickable (you can add the actual link later)
-def open_contact(event):
-    # This will be replaced with your Discord link
-    messagebox.showinfo("Contact", "Discord link will be added here!")
+# GitHub link
+github_frame = tk.Frame(contact_info_frame, bg=RS_BROWN)
+github_frame.pack(side="left", padx=5)
 
-contact_icon.bind('<Button-1>', open_contact)
-contact_text.bind('<Button-1>', open_contact)
+github_icon = tk.Label(github_frame, text="📦", 
+                      bg=RS_BROWN, fg=RS_GOLD,
+                      font=('RuneScape UF', 12))
+github_icon.pack(side="left", padx=2)
+
+github_text = tk.Label(github_frame, text="GitHub",
+                      bg=RS_BROWN, fg=RS_GOLD,
+                      font=('RuneScape UF', 10))
+github_text.pack(side="left")
+
+# Donation link
+donation_frame = tk.Frame(contact_info_frame, bg=RS_BROWN)
+donation_frame.pack(side="left", padx=5)
+
+donation_icon = tk.Label(donation_frame, text="💝", 
+                        bg=RS_BROWN, fg=RS_GOLD,
+                        font=('RuneScape UF', 12))
+donation_icon.pack(side="left", padx=2)
+
+donation_text = tk.Label(donation_frame, text="Donate",
+                        bg=RS_BROWN, fg=RS_GOLD,
+                        font=('RuneScape UF', 10))
+donation_text.pack(side="left")
+
+# Make the contact sections clickable
+def open_discord(event):
+    import webbrowser
+    webbrowser.open("https://discord.gg/TeZvrV8728")
+
+def open_github(event):
+    import webbrowser
+    webbrowser.open("https://github.com/xxmowgli/DragonMaster")
+
+def open_donation(event):
+    import webbrowser
+    webbrowser.open("https://www.xxmowgli.co.uk")
+
+# Bind click events
+discord_icon.bind('<Button-1>', open_discord)
+discord_text.bind('<Button-1>', open_discord)
+github_icon.bind('<Button-1>', open_github)
+github_text.bind('<Button-1>', open_github)
+donation_icon.bind('<Button-1>', open_donation)
+donation_text.bind('<Button-1>', open_donation)
 
 # Add these after the existing item maps but before the UI creation
 
