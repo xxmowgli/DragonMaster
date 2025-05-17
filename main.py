@@ -103,8 +103,20 @@ item_name_map = {
     "EK3fckHjkrHbATuNLd9Jhg": "clay slab unfired",
     "C-Blv0bNk7v6BOWLA8Cw-g": "clay dec",
     "sycphkkEs4cXKKC721kS2w": "clay dec unfired",
-    "7MA-NkEejSNBooCvO4XI9w": "monstrous fang"
-    
+    "7MA-NkEejSNBooCvO4XI9w": "monstrous fang",
+    "FaDdOe9tLUOzvrkYSPpb3Q": "Oak Plank",
+    "_R44FI_bhEm8Gx61swlzpA": "Stone",
+    "GXtUfUZIYgpsYAGE4y5vEg": "Ground Clay",
+    "83Kcm0CpBOcYsk-eo-dfMw": "Granite",
+    "Cu5DREB0z4_XYRGkXu8U9A": "Ground Granite",
+    "KejxKZhqBEy2BmyMUMidlA": "Leather",
+    "UyIYrQzoTkaR04aJNXLTJQ": "Hard Leather",
+    "EnjZ-B1MLkuduCRe1oLNQw": "Animal Bone",
+    "x-SiNQenZEuF0yyTPkxhiw": "Charcoal",
+    "ehZX4E-aGmiITq6BdnbgFA": "Swamp Thread",
+    "Rex-3ECcbilpOVqd6zWpIQ": "Dire Wolf Leather",
+    "3_luxedD0kyY_dd3UKYvEQ": "Adhesive",
+    "LLV95ECQPPkItvyaC0gCzQ": "Clay"
 }
 
 gear_name_map = {
