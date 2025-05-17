@@ -4,6 +4,8 @@ import tkinter as tk
 import secrets
 from tkinter import filedialog, messagebox
 from tkinter import ttk
+import glob
+import time
 
 item_name_map = {
     "2rxJ495rm0GDn4h5OWKiyQ": "Ash Logs",
@@ -275,30 +277,7 @@ def on_rune_select(event, rune_var, slot_frame, current_rune_label):
     update_rune_slot_border(slot_frame, rune_var)
 
 def load_json():
-    global current_inventory_data, current_file_path
-    file_path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
-    if not file_path:
-        return
-
-    try:
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to load JSON file: {e}")
-        return
-
-    current_inventory_data = data
-    current_file_path = file_path
-    file_name = os.path.basename(file_path)
-
-    if file_name not in json_files:
-        json_files.append(file_name)
-
-    # Clear all checkboxes first
-    for checkbox_var in slot_checkboxes:
-        checkbox_var.set(False)
-
-    refresh_display()
+    show_character_selection()
 
 def set_all_slots():
     editor = tk.Toplevel(root)
@@ -1217,11 +1196,161 @@ def clear_all_backpack_slots():
         slot_frame = inventory_frame.grid_slaves(row=i // 8, column=i % 8)[0]
         slot_frame.configure(bg=RS_EMPTY_BORDER)
 
+# Add this after the imports but before the item maps
+def get_default_save_path():
+    # Get the current user's home directory
+    home_dir = os.path.expanduser("~")
+    # Construct the default save path
+    default_path = os.path.join(home_dir, "AppData", "Local", "RSDragonwilds", "Saved", "SaveCharacters")
+    print(f"Looking for save files in: {default_path}")  # Debug print
+    return default_path
+
+def show_character_selection():
+    # Create a new window for character selection
+    selection_window = tk.Toplevel(root)
+    selection_window.title("Select Character")
+    selection_window.geometry("600x600")
+    selection_window.transient(root)
+    selection_window.grab_set()
+    style_editor_window(selection_window)
+    
+    # Add a title label
+    title_label = tk.Label(selection_window, 
+                          text="Select a Character to Load",
+                          font=('RuneScape UF', 16, 'bold'),
+                          bg=RS_BROWN,
+                          fg=RS_GOLD)
+    title_label.pack(pady=10)
+    
+    # Create a canvas with scrollbar
+    canvas = tk.Canvas(selection_window, bg=RS_BROWN)
+    scrollbar = ttk.Scrollbar(selection_window, orient="vertical", command=canvas.yview)
+    scrollable_frame = tk.Frame(canvas, bg=RS_BROWN)
+    
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+    
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Pack the canvas and scrollbar
+    canvas.pack(side="left", fill="both", expand=True, padx=20, pady=10)
+    scrollbar.pack(side="right", fill="y")
+    
+    # Add browse button at the top
+    browse_button = tk.Button(scrollable_frame,
+                            text="Browse for Save Folder",
+                            command=lambda: browse_for_folder(scrollable_frame),
+                            bg=RS_DARK_TAN,
+                            fg=RS_GOLD,
+                            font=('RuneScape UF', 12, 'bold'),
+                            width=25,
+                            height=2)
+    browse_button.pack(pady=10)
+    
+    # Try to load files from default location
+    default_path = get_default_save_path()
+    if os.path.exists(default_path):
+        # Find all JSON files in the default path, excluding copies
+        json_files = [f for f in glob.glob(os.path.join(default_path, "*.json")) 
+                     if not any(copy_text in f.lower() for copy_text in ["- copy", "-copy"])]
+        json_files.sort(key=os.path.getmtime, reverse=True)
+        
+        # Add a button for each file
+        for file in json_files:
+            # Create a frame for the character button and backup controls
+            char_frame = tk.Frame(scrollable_frame, bg=RS_BROWN)
+            char_frame.pack(fill="x", pady=5)
+            
+            # Character button
+            file_name = os.path.basename(file).replace(".json", "")
+            btn = tk.Button(char_frame,
+                          text=file_name,
+                          command=lambda f=file: load_character(f),
+                          bg=RS_DARK_TAN,
+                          fg=RS_GOLD,
+                          font=('RuneScape UF', 12),
+                          width=30,
+                          height=2)
+            btn.pack(pady=5)
+            
+            # Add backup controls
+            create_backup_controls(char_frame, file)
+
+def show_world_backups():
+    # Create a new window for world backup selection
+    world_window = tk.Toplevel(root)
+    world_window.title("World Backups")
+    world_window.geometry("600x600")
+    world_window.transient(root)
+    world_window.grab_set()
+    style_editor_window(world_window)
+    
+    # Add a title label
+    title_label = tk.Label(world_window, 
+                          text="World Backups",
+                          font=('RuneScape UF', 16, 'bold'),
+                          bg=RS_BROWN,
+                          fg=RS_GOLD)
+    title_label.pack(pady=10)
+    
+    # Create a canvas with scrollbar
+    canvas = tk.Canvas(world_window, bg=RS_BROWN)
+    scrollbar = ttk.Scrollbar(world_window, orient="vertical", command=canvas.yview)
+    scrollable_frame = tk.Frame(canvas, bg=RS_BROWN)
+    
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+    
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Pack the canvas and scrollbar
+    canvas.pack(side="left", fill="both", expand=True, padx=20, pady=10)
+    scrollbar.pack(side="right", fill="y")
+    
+    # Get the default save games path
+    default_path = os.path.join(os.path.expanduser("~"), "AppData", "Local", "RSDragonwilds", "Saved", "SaveGames")
+    
+    if os.path.exists(default_path):
+        # Find all SAV files in the default path, excluding EnhancedInputUsersettings (case-insensitive)
+        sav_files = [f for f in glob.glob(os.path.join(default_path, "*.sav")) 
+                    if "enhancedinputusersettings" not in f.lower()]
+        sav_files.sort(key=os.path.getmtime, reverse=True)
+        
+        # Add a label for each file
+        for file in sav_files:
+            # Create a frame for the world label and backup controls
+            world_frame = tk.Frame(scrollable_frame, bg=RS_BROWN)
+            world_frame.pack(fill="x", pady=5)
+            
+            # World label
+            file_name = os.path.basename(file).replace(".sav", "")
+            label = tk.Label(world_frame,
+                           text=file_name,
+                           bg=RS_DARK_TAN,
+                           fg=RS_GOLD,
+                           font=('RuneScape UF', 12),
+                           width=30,
+                           height=2)
+            label.pack(pady=5)
+            
+            # Add backup controls
+            create_world_backup_controls(world_frame, file)
+
 # Create the main window and set up the UI
 root = tk.Tk()
-root.title("DragonMaster v0.1 May 2025")
+root.title("DragonMaster v0.2 May 2025")
 root.geometry("1500x900")
 root.configure(bg='#2B1810')  # Dark brown background like RuneScape
+
+# Show character selection window when the app starts, but after a short delay
+root.after(100, lambda: root.withdraw())  # Hide the main window
+root.after(200, lambda: (show_character_selection(), root.deiconify()))  # Show character selection, then show main window
 
 # Define RuneScape-style colors
 RS_BROWN = '#2B1810'  # Dark brown background
@@ -1267,6 +1396,12 @@ load_preset_btn = tk.Button(control_frame, text="💾 Load Preset", command=load
                     bg=RS_DARK_TAN, fg=RS_GOLD, font=('RuneScape UF', 10, 'bold'),
                     relief='raised', borderwidth=2)
 load_preset_btn.pack(side=tk.LEFT, padx=5)
+
+# Add this after the control_frame creation but before the load_btn
+world_backup_btn = tk.Button(control_frame, text="🌍 World Backups", command=show_world_backups,
+                    bg=RS_DARK_TAN, fg=RS_GOLD, font=('RuneScape UF', 10, 'bold'),
+                    relief='raised', borderwidth=2)
+world_backup_btn.pack(side=tk.LEFT, padx=5)
 
 # Main Top Frame for two boxes
 top_frame = tk.Frame(root, bg=RS_BROWN)
@@ -1777,5 +1912,592 @@ def update_loadout_item_label(label, item_var):
     # Get the current item
     current_item = item_var.get()
     label.configure(text=current_item)
+
+def create_backup_controls(parent, file_path):
+    # Create a frame for the backup controls
+    backup_frame = tk.Frame(parent, bg=RS_BROWN)
+    backup_frame.pack(fill="x", pady=2)
+    
+    # Save Backup button
+    save_btn = tk.Button(backup_frame,
+                        text="Save Backup",
+                        command=lambda: save_backup(file_path, backup_dropdown),
+                        bg=RS_DARK_TAN,
+                        fg=RS_GOLD,
+                        font=('RuneScape UF', 10),
+                        width=10)
+    save_btn.pack(side="left", padx=5)
+    
+    # Backup dropdown
+    backup_var = tk.StringVar()
+    backup_dropdown = ttk.Combobox(backup_frame,
+                                  textvariable=backup_var,
+                                  state='readonly',
+                                  width=20)
+    backup_dropdown.pack(side="left", padx=5)
+    
+    # Load Backup button
+    load_btn = tk.Button(backup_frame,
+                        text="Load Backup",
+                        command=lambda: load_backup(backup_var.get(), file_path, backup_dropdown),
+                        bg=RS_DARK_TAN,
+                        fg=RS_GOLD,
+                        font=('RuneScape UF', 10),
+                        width=10)
+    load_btn.pack(side="left", padx=5)
+    
+    # Delete Backup button
+    delete_btn = tk.Button(backup_frame,
+                          text="Delete Backup",
+                          command=lambda: delete_backup(file_path, backup_var.get(), backup_dropdown),
+                          bg=RS_DARK_TAN,
+                          fg=RS_GOLD,
+                          font=('RuneScape UF', 10),
+                          width=10)
+    delete_btn.pack(side="left", padx=5)
+    
+    # Rename Backup button
+    rename_btn = tk.Button(backup_frame,
+                          text="Rename Backup",
+                          command=lambda: rename_backup(file_path, backup_var.get(), backup_dropdown),
+                          bg=RS_DARK_TAN,
+                          fg=RS_GOLD,
+                          font=('RuneScape UF', 10),
+                          width=10)
+    rename_btn.pack(side="left", padx=5)
+    
+    # Update the dropdown with available backups
+    update_backup_list(file_path, backup_dropdown)
+    
+    return backup_frame
+
+def create_world_backup_controls(parent, file_path):
+    # Create a frame for the backup controls
+    backup_frame = tk.Frame(parent, bg=RS_BROWN)
+    backup_frame.pack(fill="x", pady=2)
+    
+    # Save Backup button
+    save_btn = tk.Button(backup_frame,
+                        text="Save Backup",
+                        command=lambda: save_world_backup(file_path, backup_dropdown),
+                        bg=RS_DARK_TAN,
+                        fg=RS_GOLD,
+                        font=('RuneScape UF', 10),
+                        width=10)
+    save_btn.pack(side="left", padx=5)
+    
+    # Backup dropdown
+    backup_var = tk.StringVar()
+    backup_dropdown = ttk.Combobox(backup_frame,
+                                  textvariable=backup_var,
+                                  state='readonly',
+                                  width=20)
+    backup_dropdown.pack(side="left", padx=5)
+    
+    # Load Backup button
+    load_btn = tk.Button(backup_frame,
+                        text="Load Backup",
+                        command=lambda: load_world_backup(backup_var.get(), file_path, backup_dropdown),
+                        bg=RS_DARK_TAN,
+                        fg=RS_GOLD,
+                        font=('RuneScape UF', 10),
+                        width=10)
+    load_btn.pack(side="left", padx=5)
+    
+    # Delete Backup button
+    delete_btn = tk.Button(backup_frame,
+                          text="Delete Backup",
+                          command=lambda: delete_world_backup(file_path, backup_var.get(), backup_dropdown),
+                          bg=RS_DARK_TAN,
+                          fg=RS_GOLD,
+                          font=('RuneScape UF', 10),
+                          width=10)
+    delete_btn.pack(side="left", padx=5)
+    
+    # Rename Backup button
+    rename_btn = tk.Button(backup_frame,
+                          text="Rename Backup",
+                          command=lambda: rename_world_backup(file_path, backup_var.get(), backup_dropdown),
+                          bg=RS_DARK_TAN,
+                          fg=RS_GOLD,
+                          font=('RuneScape UF', 10),
+                          width=10)
+    rename_btn.pack(side="left", padx=5)
+    
+    # Update the dropdown with available backups
+    update_world_backup_list(file_path, backup_dropdown)
+    
+    return backup_frame
+
+def save_backup(file_path, dropdown):
+    try:
+        # Create backup directory name from the JSON filename
+        json_name = os.path.basename(file_path).replace(".json", "")
+        backup_dir = os.path.join(os.path.dirname(file_path), json_name)
+        
+        # Create the backup directory if it doesn't exist
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+        
+        # Create timestamp for the backup folder
+        timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+        backup_path = os.path.join(backup_dir, timestamp)
+        
+        # Create the timestamp directory
+        os.makedirs(backup_path)
+        
+        # Copy the JSON file to the backup location
+        backup_file = os.path.join(backup_path, os.path.basename(file_path))
+        import shutil
+        shutil.copy2(file_path, backup_file)
+        
+        messagebox.showinfo("Success", f"Backup created successfully at {timestamp}")
+        
+        # Update the dropdown directly
+        if os.path.exists(backup_dir):
+            backups = [d for d in os.listdir(backup_dir) 
+                      if os.path.isdir(os.path.join(backup_dir, d))]
+            backups.sort(reverse=True)  # Most recent first
+            dropdown['values'] = backups
+            dropdown.set(timestamp)  # Set to the new backup
+            dropdown.update()
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to create backup: {e}")
+
+def load_backup(backup_name, file_path, dropdown):
+    if not backup_name:
+        messagebox.showwarning("Warning", "Please select a backup to load.")
+        return
+        
+    try:
+        print(f"Loading backup: {backup_name}")  # Debug print
+        print(f"From file: {file_path}")  # Debug print
+        
+        # First, create a backup of the current state
+        json_name = os.path.basename(file_path).replace(".json", "")
+        backup_dir = os.path.join(os.path.dirname(file_path), json_name)
+        
+        # Create timestamp for the current state backup
+        timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+        current_backup_path = os.path.join(backup_dir, f"pre_load_{timestamp}")
+        
+        print(f"Creating pre-load backup at: {current_backup_path}")  # Debug print
+        
+        # Create the backup directory if it doesn't exist
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+        
+        # Create the timestamp directory
+        os.makedirs(current_backup_path)
+        
+        # Copy the current JSON file to the backup location
+        import shutil
+        current_backup_file = os.path.join(current_backup_path, os.path.basename(file_path))
+        shutil.copy2(file_path, current_backup_file)
+        print(f"Created pre-load backup at: {current_backup_file}")  # Debug print
+        
+        # Now load the selected backup
+        selected_backup_path = os.path.join(backup_dir, backup_name)
+        backup_file = os.path.join(selected_backup_path, os.path.basename(file_path))
+        
+        print(f"Loading backup from: {backup_file}")  # Debug print
+        
+        if not os.path.exists(backup_file):
+            messagebox.showerror("Error", f"Backup file not found: {backup_file}")
+            return
+            
+        # Copy the backup file to the main location
+        shutil.copy2(backup_file, file_path)
+        print(f"Copied backup to: {file_path}")  # Debug print
+        
+        # Update the dropdown to include the new pre-load backup
+        if os.path.exists(backup_dir):
+            backups = [d for d in os.listdir(backup_dir) 
+                      if os.path.isdir(os.path.join(backup_dir, d))]
+            backups.sort(reverse=True)  # Most recent first
+            dropdown['values'] = backups
+            dropdown.set(backup_name)  # Keep the selected backup selected
+            dropdown.update()
+            print(f"Updated dropdown with {len(backups)} backups")  # Debug print
+        
+        messagebox.showinfo("Success", f"Backup loaded successfully. A backup of your previous state was created at {timestamp}")
+        
+        # Reload the character data
+        print("Reloading character data...")  # Debug print
+        load_character(file_path)
+        print("Character data reloaded")  # Debug print
+        
+    except Exception as e:
+        print(f"Error in load_backup: {str(e)}")  # Debug print
+        messagebox.showerror("Error", f"Failed to load backup: {e}")
+
+def delete_backup(file_path, backup_name, dropdown):
+    if not backup_name:
+        messagebox.showwarning("Warning", "Please select a backup to delete.")
+        return
+        
+    # Confirm deletion
+    if not messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete backup '{backup_name}'?"):
+        return
+        
+    try:
+        # Get the backup directory path
+        json_name = os.path.basename(file_path).replace(".json", "")
+        backup_dir = os.path.join(os.path.dirname(file_path), json_name)
+        backup_path = os.path.join(backup_dir, backup_name)
+        
+        # Delete the backup folder and its contents
+        import shutil
+        shutil.rmtree(backup_path)
+        
+        messagebox.showinfo("Success", f"Backup '{backup_name}' deleted successfully.")
+        
+        # Update the dropdown directly
+        if os.path.exists(backup_dir):
+            backups = [d for d in os.listdir(backup_dir) 
+                      if os.path.isdir(os.path.join(backup_dir, d))]
+            backups.sort(reverse=True)  # Most recent first
+            dropdown['values'] = backups
+            if backups:
+                dropdown.set(backups[0])  # Set to most recent
+            else:
+                dropdown.set('')
+            dropdown.update()
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to delete backup: {e}")
+
+def rename_backup(file_path, backup_name, dropdown):
+    if not backup_name:
+        messagebox.showwarning("Warning", "Please select a backup to rename.")
+        return
+        
+    # Create a dialog to get the new name
+    dialog = tk.Toplevel(root)
+    dialog.title("Rename Backup")
+    dialog.geometry("300x150")
+    dialog.transient(root)
+    dialog.grab_set()
+    style_editor_window(dialog)
+    
+    # Add a label and entry for the new name
+    tk.Label(dialog, text="Enter new backup name:", bg=RS_BROWN, fg=RS_GOLD).pack(pady=10)
+    new_name_var = tk.StringVar(value=backup_name)
+    new_name_entry = tk.Entry(dialog, textvariable=new_name_var, width=30)
+    new_name_entry.pack(pady=5)
+    
+    def do_rename():
+        new_name = new_name_var.get().strip()
+        if not new_name:
+            messagebox.showwarning("Warning", "New name cannot be empty.")
+            return
+            
+        try:
+            # Get the backup directory path
+            json_name = os.path.basename(file_path).replace(".json", "")
+            backup_dir = os.path.join(os.path.dirname(file_path), json_name)
+            old_path = os.path.join(backup_dir, backup_name)
+            new_path = os.path.join(backup_dir, new_name)
+            
+            # Check if new name already exists
+            if os.path.exists(new_path):
+                messagebox.showerror("Error", f"Backup name '{new_name}' already exists.")
+                return
+            
+            # Rename the backup folder
+            os.rename(old_path, new_path)
+            
+            # Update the dropdown that triggered the rename
+            update_backup_list(file_path, dropdown)
+            dropdown.set(new_name)  # Set the new name in the dropdown
+            
+            messagebox.showinfo("Success", f"Backup renamed to '{new_name}' successfully.")
+            dialog.destroy()
+            
+            # Update all other backup dropdowns
+            for widget in root.winfo_children():
+                if isinstance(widget, tk.Toplevel):
+                    for child in widget.winfo_children():
+                        if isinstance(child, tk.Frame):
+                            for grandchild in child.winfo_children():
+                                if isinstance(grandchild, tk.Frame):
+                                    for great_grandchild in grandchild.winfo_children():
+                                        if isinstance(great_grandchild, tk.Frame):
+                                            for combo in great_grandchild.winfo_children():
+                                                if isinstance(combo, ttk.Combobox) and combo != dropdown:
+                                                    update_backup_list(file_path, combo)
+                                                    
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to rename backup: {e}")
+    
+    # Add buttons
+    button_frame = tk.Frame(dialog, bg=RS_BROWN)
+    button_frame.pack(pady=10)
+    
+    tk.Button(button_frame, text="Rename", command=do_rename,
+              bg=RS_DARK_TAN, fg=RS_GOLD, font=('RuneScape UF', 10)).pack(side="left", padx=5)
+    tk.Button(button_frame, text="Cancel", command=dialog.destroy,
+              bg=RS_DARK_TAN, fg=RS_GOLD, font=('RuneScape UF', 10)).pack(side="left", padx=5)
+
+def update_backup_list(file_path, dropdown):
+    try:
+        # Get the backup directory path
+        json_name = os.path.basename(file_path).replace(".json", "")
+        backup_dir = os.path.join(os.path.dirname(file_path), json_name)
+        
+        # Get list of backup folders if they exist
+        if os.path.exists(backup_dir):
+            backups = [d for d in os.listdir(backup_dir) 
+                      if os.path.isdir(os.path.join(backup_dir, d))]
+            backups.sort(reverse=True)  # Most recent first
+            
+            # Update the dropdown values
+            dropdown['values'] = backups
+            
+            # If there are backups, select the most recent one
+            if backups:
+                dropdown.set(backups[0])
+            else:
+                dropdown.set('')
+            
+            # Force the dropdown to update
+            dropdown.event_generate('<<ComboboxSelected>>')
+    except Exception as e:
+        print(f"Error updating backup list: {e}")
+
+def save_world_backup(file_path, dropdown):
+    try:
+        # Create backup directory name from the SAV filename
+        sav_name = os.path.basename(file_path).replace(".sav", "")
+        backup_dir = os.path.join(os.path.dirname(file_path), sav_name)
+        
+        # Create the backup directory if it doesn't exist
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+        
+        # Create timestamp for the backup folder
+        timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+        backup_path = os.path.join(backup_dir, timestamp)
+        
+        # Create the timestamp directory
+        os.makedirs(backup_path)
+        
+        # Copy the SAV file to the backup location
+        backup_file = os.path.join(backup_path, os.path.basename(file_path))
+        import shutil
+        shutil.copy2(file_path, backup_file)
+        
+        messagebox.showinfo("Success", f"World backup created successfully at {timestamp}")
+        
+        # Update the dropdown directly
+        if os.path.exists(backup_dir):
+            backups = [d for d in os.listdir(backup_dir) 
+                      if os.path.isdir(os.path.join(backup_dir, d))]
+            backups.sort(reverse=True)  # Most recent first
+            dropdown['values'] = backups
+            dropdown.set(timestamp)  # Set to the new backup
+            dropdown.update()
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to create world backup: {e}")
+
+def load_world_backup(backup_name, file_path, dropdown):
+    if not backup_name:
+        messagebox.showwarning("Warning", "Please select a backup to load.")
+        return
+        
+    try:
+        # First, create a backup of the current state
+        sav_name = os.path.basename(file_path).replace(".sav", "")
+        backup_dir = os.path.join(os.path.dirname(file_path), sav_name)
+        
+        # Create timestamp for the current state backup
+        timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+        current_backup_path = os.path.join(backup_dir, f"pre_load_{timestamp}")
+        
+        # Create the backup directory if it doesn't exist
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+        
+        # Create the timestamp directory
+        os.makedirs(current_backup_path)
+        
+        # Copy the current SAV file to the backup location
+        import shutil
+        current_backup_file = os.path.join(current_backup_path, os.path.basename(file_path))
+        shutil.copy2(file_path, current_backup_file)
+        
+        # Now load the selected backup
+        selected_backup_path = os.path.join(backup_dir, backup_name)
+        backup_file = os.path.join(selected_backup_path, os.path.basename(file_path))
+        
+        if not os.path.exists(backup_file):
+            messagebox.showerror("Error", f"Backup file not found: {backup_file}")
+            return
+            
+        # Copy the backup file to the main location
+        shutil.copy2(backup_file, file_path)
+        
+        # Update the dropdown to include the new pre-load backup
+        if os.path.exists(backup_dir):
+            backups = [d for d in os.listdir(backup_dir) 
+                      if os.path.isdir(os.path.join(backup_dir, d))]
+            backups.sort(reverse=True)  # Most recent first
+            dropdown['values'] = backups
+            dropdown.set(backup_name)  # Keep the selected backup selected
+            dropdown.update()
+        
+        messagebox.showinfo("Success", f"World backup loaded successfully. A backup of your previous state was created at {timestamp}")
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to load world backup: {e}")
+
+def delete_world_backup(file_path, backup_name, dropdown):
+    if not backup_name:
+        messagebox.showwarning("Warning", "Please select a backup to delete.")
+        return
+        
+    # Confirm deletion
+    if not messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete backup '{backup_name}'?"):
+        return
+        
+    try:
+        # Get the backup directory path
+        sav_name = os.path.basename(file_path).replace(".sav", "")
+        backup_dir = os.path.join(os.path.dirname(file_path), sav_name)
+        backup_path = os.path.join(backup_dir, backup_name)
+        
+        # Delete the backup folder and its contents
+        import shutil
+        shutil.rmtree(backup_path)
+        
+        messagebox.showinfo("Success", f"Backup '{backup_name}' deleted successfully.")
+        
+        # Update the dropdown directly
+        if os.path.exists(backup_dir):
+            backups = [d for d in os.listdir(backup_dir) 
+                      if os.path.isdir(os.path.join(backup_dir, d))]
+            backups.sort(reverse=True)  # Most recent first
+            dropdown['values'] = backups
+            if backups:
+                dropdown.set(backups[0])  # Set to most recent
+            else:
+                dropdown.set('')
+            dropdown.update()
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to delete backup: {e}")
+
+def rename_world_backup(file_path, backup_name, dropdown):
+    if not backup_name:
+        messagebox.showwarning("Warning", "Please select a backup to rename.")
+        return
+        
+    # Create a dialog to get the new name
+    dialog = tk.Toplevel(root)
+    dialog.title("Rename Backup")
+    dialog.geometry("300x150")
+    dialog.transient(root)
+    dialog.grab_set()
+    style_editor_window(dialog)
+    
+    # Add a label and entry for the new name
+    tk.Label(dialog, text="Enter new backup name:", bg=RS_BROWN, fg=RS_GOLD).pack(pady=10)
+    new_name_var = tk.StringVar(value=backup_name)
+    new_name_entry = tk.Entry(dialog, textvariable=new_name_var, width=30)
+    new_name_entry.pack(pady=5)
+    
+    def do_rename():
+        new_name = new_name_var.get().strip()
+        if not new_name:
+            messagebox.showwarning("Warning", "New name cannot be empty.")
+            return
+            
+        try:
+            # Get the backup directory path
+            sav_name = os.path.basename(file_path).replace(".sav", "")
+            backup_dir = os.path.join(os.path.dirname(file_path), sav_name)
+            old_path = os.path.join(backup_dir, backup_name)
+            new_path = os.path.join(backup_dir, new_name)
+            
+            # Check if new name already exists
+            if os.path.exists(new_path):
+                messagebox.showerror("Error", f"Backup name '{new_name}' already exists.")
+                return
+            
+            # Rename the backup folder
+            os.rename(old_path, new_path)
+            
+            # Update the dropdown that triggered the rename
+            update_world_backup_list(file_path, dropdown)
+            dropdown.set(new_name)  # Set the new name in the dropdown
+            
+            messagebox.showinfo("Success", f"Backup renamed to '{new_name}' successfully.")
+            dialog.destroy()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to rename backup: {e}")
+    
+    # Add buttons
+    button_frame = tk.Frame(dialog, bg=RS_BROWN)
+    button_frame.pack(pady=10)
+    
+    tk.Button(button_frame, text="Rename", command=do_rename,
+              bg=RS_DARK_TAN, fg=RS_GOLD, font=('RuneScape UF', 10)).pack(side="left", padx=5)
+    tk.Button(button_frame, text="Cancel", command=dialog.destroy,
+              bg=RS_DARK_TAN, fg=RS_GOLD, font=('RuneScape UF', 10)).pack(side="left", padx=5)
+
+def update_world_backup_list(file_path, dropdown):
+    try:
+        # Get the backup directory path
+        sav_name = os.path.basename(file_path).replace(".sav", "")
+        backup_dir = os.path.join(os.path.dirname(file_path), sav_name)
+        
+        # Get list of backup folders if they exist
+        if os.path.exists(backup_dir):
+            backups = [d for d in os.listdir(backup_dir) 
+                      if os.path.isdir(os.path.join(backup_dir, d))]
+            backups.sort(reverse=True)  # Most recent first
+            
+            # Update the dropdown values
+            dropdown['values'] = backups
+            
+            # If there are backups, select the most recent one
+            if backups:
+                dropdown.set(backups[0])
+            else:
+                dropdown.set('')
+            
+            # Force the dropdown to update
+            dropdown.event_generate('<<ComboboxSelected>>')
+    except Exception as e:
+        print(f"Error updating world backup list: {e}")
+
+def load_character(file_path):
+    global current_inventory_data, current_file_path
+    
+    try:
+        # Load the JSON file
+        with open(file_path, 'r') as f:
+            current_inventory_data = json.load(f)
+        
+        # Store the current file path
+        current_file_path = file_path
+        
+        # Update the window title with the character name
+        character_name = os.path.basename(file_path).replace(".json", "")
+        root.title(f"DragonMaster v0.1.2 May 2025 - {character_name}")
+        
+        # Refresh the display
+        refresh_display()
+        
+        # Close the character selection window
+        for widget in root.winfo_children():
+            if isinstance(widget, tk.Toplevel):
+                widget.destroy()
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to load character: {e}")
 
 root.mainloop()
